@@ -2506,7 +2506,7 @@ function MixArr(cnt,dir){
     //console.log(dir)
     cnt0 = dir ==1? cnt0.concat(cnt[i]):cnt0.concat(cnt[cnt.length-2-i])
   }
-  cnt0 = dir ==1? cnt0.concat(cnt[cnt.length-1].sort(ToTag)):(cnt[cnt.length-1].sort(ToTagR)).concat(cnt0)
+  cnt0 = dir ==1? cnt0.concat(cnt[cnt.length-1]) : cnt[cnt.length-1].concat(cnt0)
   return cnt0
 }
 
