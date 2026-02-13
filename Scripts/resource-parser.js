@@ -4213,55 +4213,49 @@ function NOT(array) {
 }
 
 
+
 /**
  * 独立流量预警函数
  * 参数 Pflowwarn: URL 中传入的阈值 (如 80 代表 80%)
  */
 function FlowWarning() {
-  // 1. 如果未设置阈值(为0) 或 没有流量信息，直接退出
-  if (Pflowwarn == 0 || !subinfo) return;
+  // 1. 强制弹窗调试信息 (调试完成后请删除)
+  var debugMsg = "参数值: " + Pflowwarn + "\n";
+  debugMsg += "流量头: " + (subinfo ? "存在" : "为空") + "\n";
+  
+  if (!subinfo) {
+     // 如果这里弹窗，说明服务器没返回流量信息，或者 QX 没传给脚本
+     $notify("调试：缺少流量信息", "无法计算", debugMsg);
+     return;
+  }
 
   try {
     var sinfo = subinfo.replace(/ /g, "").toLowerCase();
-    
-    // 2. 解析数值
     var totalMatch = sinfo.match(/total=(\d+)/);
     var totalBytes = totalMatch ? parseFloat(totalMatch[1]) : 0;
-
-    // 总流量异常则退出
-    if (totalBytes <= 0) return;
-
+    
     var upMatch = sinfo.match(/upload=(\d+)/);
     var downMatch = sinfo.match(/download=(\d+)/);
     var uploadBytes = upMatch ? parseFloat(upMatch[1]) : 0;
     var downloadBytes = downMatch ? parseFloat(downMatch[1]) : 0;
     var usedBytes = uploadBytes + downloadBytes;
-
-    // 3. 计算使用率
-    var ratio = usedBytes / totalBytes;
-
-    // 4. 处理阈值格式 (支持 "80" 或 "0.8")
+    var ratio = totalBytes > 0 ? (usedBytes / totalBytes) : 0;
+    
+    // 处理阈值
     var threshold = parseFloat(Pflowwarn);
-    if (threshold > 1) {
-        threshold = threshold / 100; // 将 80 转为 0.8
+    if (threshold > 1) threshold = threshold / 100;
+
+    debugMsg += "使用率: " + (ratio*100).toFixed(2) + "%\n";
+    debugMsg += "阈值: " + (threshold*100).toFixed(2) + "%";
+
+    // 2. 无论是否超过阈值，都弹窗告诉你是怎么判定的
+    if (threshold > 0 && ratio >= threshold) {
+       $notify("✅ 触发预警 (调试模式)", "应该弹窗", debugMsg);
+    } else {
+       $notify("❌ 未触发预警 (调试模式)", "条件不满足", debugMsg);
     }
 
-    // 5. 判断是否超过阈值
-    if (ratio >= threshold) {
-      // 格式化显示
-      var usedGB = (usedBytes / (1024 * 1024 * 1024)).toFixed(2);
-      var totalGB = (totalBytes / (1024 * 1024 * 1024)).toFixed(2);
-      var percentStr = (ratio * 100).toFixed(1) + "%";
-      var thresholdStr = (threshold * 100) + "%";
-      
-      $notify(
-        "🚨 流量预警: ⟦" + subtag + "⟧", 
-        "📈 使用量已达 " + percentStr + " (阈值 " + thresholdStr + ")", 
-        "已用: " + usedGB + "GB  /  总计: " + totalGB + "GB", 
-        subinfo_link
-      );
-    }
   } catch (e) {
-    console.log("FlowWarning Error: " + e);
+    $notify("💥 运行报错", e, "");
   }
 }
