@@ -160,7 +160,6 @@ if(version == 0) { $notify("⚠️ 请更新 Quantumult X 至最新商店版本\
 
 
 SubFlow() //流量通知
-FlowWarning() // 流量预警检测
 
 
 // 参数获取
@@ -247,6 +246,8 @@ var ProfileInfo = {
   "filter":"",
   "rewrite":""
 }
+
+FlowWarning()
 
 function VCheck(cnt) {
   cnts=cnt.split("\n").filter(Boolean).map(item=>item.trim()).filter(item => /^http/.test(item)).map(item=>"\""+item+"\"")
@@ -4219,43 +4220,36 @@ function NOT(array) {
  * 参数 Pflowwarn: URL 中传入的阈值 (如 80 代表 80%)
  */
 function FlowWarning() {
-  // 1. 强制弹窗调试信息 (调试完成后请删除)
-  var debugMsg = "参数值: " + Pflowwarn + "\n";
-  debugMsg += "流量头: " + (subinfo ? "存在" : "为空") + "\n";
-  
-  if (!subinfo) {
-     // 如果这里弹窗，说明服务器没返回流量信息，或者 QX 没传给脚本
-     $notify("调试：缺少流量信息", "无法计算", debugMsg);
-     return;
-  }
+  if (!subinfo || !Pflowwarn) return;
 
   try {
     var sinfo = subinfo.replace(/ /g, "").toLowerCase();
     var totalMatch = sinfo.match(/total=(\d+)/);
     var totalBytes = totalMatch ? parseFloat(totalMatch[1]) : 0;
-    
+    if (totalBytes <= 0) return;
     var upMatch = sinfo.match(/upload=(\d+)/);
     var downMatch = sinfo.match(/download=(\d+)/);
     var uploadBytes = upMatch ? parseFloat(upMatch[1]) : 0;
     var downloadBytes = downMatch ? parseFloat(downMatch[1]) : 0;
     var usedBytes = uploadBytes + downloadBytes;
-    var ratio = totalBytes > 0 ? (usedBytes / totalBytes) : 0;
+    var ratio = usedBytes / totalBytes;
     
-    // 处理阈值
     var threshold = parseFloat(Pflowwarn);
     if (threshold > 1) threshold = threshold / 100;
 
-    debugMsg += "使用率: " + (ratio*100).toFixed(2) + "%\n";
-    debugMsg += "阈值: " + (threshold*100).toFixed(2) + "%";
-
-    // 2. 无论是否超过阈值，都弹窗告诉你是怎么判定的
     if (threshold > 0 && ratio >= threshold) {
-       $notify("✅ 触发预警 (调试模式)", "应该弹窗", debugMsg);
-    } else {
-       $notify("❌ 未触发预警 (调试模式)", "条件不满足", debugMsg);
-    }
+      var usedGB = (usedBytes / (1024 ** 3)).toFixed(2);
+      var totalGB = (totalBytes / (1024 ** 3)).toFixed(2);
+      var percentStr = (ratio * 100).toFixed(2) + "%";
+      var thresholdStr = (threshold * 100).toFixed(0) + "%";
 
+      $notify(
+        "🚨 流量预警: ⟦" + subtag + "⟧", 
+        "📈 使用量百分比 " + percentStr + " (阈值 " + thresholdStr + ")", 
+        "已用: " + usedGB + "GB  /  总计: " + totalGB + "GB"
+      );
+    }
   } catch (e) {
-    $notify("💥 运行报错", e, "");
+    console.log("FlowWarning Error: " + e);
   }
 }
