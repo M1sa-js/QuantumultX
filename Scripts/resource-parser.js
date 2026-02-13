@@ -50,6 +50,7 @@
   ❖ sort=IEPL<IPLC<BGP , 靠后排序
 ⦿ info=1, 开启通知提示机场 ✈️ 流量信息(如有提供);
 ⦿ flow=2022-06-02:1000:54, 订阅到期时间:总流量:已用流量
+
 ⦿ 占位符，可用于 rename/replace 等操作
   ❖ $type0/1/2/3/4/5/6/7 占位符，将节点类型(ss/ssr/vmess 等)作为可操作参数，如
     ∎ rename=@|$type2
@@ -159,6 +160,7 @@ if(version == 0) { $notify("⚠️ 请更新 Quantumult X 至最新商店版本\
 
 
 SubFlow() //流量通知
+FlowWarning() // 流量预警检测
 
 
 // 参数获取
@@ -215,6 +217,7 @@ var PcheckU = mark0 && para1.indexOf("checkurl=") != -1 ? decodeURIComponent(par
 typeQ = PRelay!=""? "server":typeQ
 var typec="" //check result type
 var Pflow=mark0 && para1.indexOf("flow=") != -1 ? para1.split("flow=")[1].split("&")[0] : 0; // 流量时间等参数
+var Pflowwarn = mark0 && para1.indexOf("flowwarn=") != -1 ? para1.split("flowwarn=")[1].split("&")[0] : 0; // 流量预警百分比参数
 var PProfile = mark0 && para1.indexOf("profile=") != -1 ? para1.split("profile=")[1].split("&")[0] : 0; // 通过URL-Scheme导入完整配置参数
 var Palpn = mark0 && para1.indexOf("alpn=") != -1 && version >= 712? para1.split("alpn=")[1].split("&")[0] : ""; // over-tls 类型，alpn参数
 var Pobfs = mark0 && para1.indexOf("obfs=") != -1 && version >= 770? para1.split("obfs=")[1].split("&")[0] : ""; // 指定特殊情况下的 obfs=xx-http 类型
@@ -4207,4 +4210,58 @@ function OR(...args) {
 
 function NOT(array) {
     return array.map(c => !c);
+}
+
+
+/**
+ * 独立流量预警函数
+ * 参数 Pflowwarn: URL 中传入的阈值 (如 80 代表 80%)
+ */
+function FlowWarning() {
+  // 1. 如果未设置阈值(为0) 或 没有流量信息，直接退出
+  if (Pflowwarn == 0 || !subinfo) return;
+
+  try {
+    var sinfo = subinfo.replace(/ /g, "").toLowerCase();
+    
+    // 2. 解析数值
+    var totalMatch = sinfo.match(/total=(\d+)/);
+    var totalBytes = totalMatch ? parseFloat(totalMatch[1]) : 0;
+
+    // 总流量异常则退出
+    if (totalBytes <= 0) return;
+
+    var upMatch = sinfo.match(/upload=(\d+)/);
+    var downMatch = sinfo.match(/download=(\d+)/);
+    var uploadBytes = upMatch ? parseFloat(upMatch[1]) : 0;
+    var downloadBytes = downMatch ? parseFloat(downMatch[1]) : 0;
+    var usedBytes = uploadBytes + downloadBytes;
+
+    // 3. 计算使用率
+    var ratio = usedBytes / totalBytes;
+
+    // 4. 处理阈值格式 (支持 "80" 或 "0.8")
+    var threshold = parseFloat(Pflowwarn);
+    if (threshold > 1) {
+        threshold = threshold / 100; // 将 80 转为 0.8
+    }
+
+    // 5. 判断是否超过阈值
+    if (ratio >= threshold) {
+      // 格式化显示
+      var usedGB = (usedBytes / (1024 * 1024 * 1024)).toFixed(2);
+      var totalGB = (totalBytes / (1024 * 1024 * 1024)).toFixed(2);
+      var percentStr = (ratio * 100).toFixed(1) + "%";
+      var thresholdStr = (threshold * 100) + "%";
+      
+      $notify(
+        "🚨 流量预警: ⟦" + subtag + "⟧", 
+        "📈 使用量已达 " + percentStr + " (阈值 " + thresholdStr + ")", 
+        "已用: " + usedGB + "GB  /  总计: " + totalGB + "GB", 
+        subinfo_link
+      );
+    }
+  } catch (e) {
+    console.log("FlowWarning Error: " + e);
+  }
 }
